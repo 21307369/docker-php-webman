@@ -1,6 +1,6 @@
 # FROM php:7.4.33-cli-alpine
-FROM php:8.1.28-cli-alpine
-#FROM php:8.2.18-cli-alpine
+# FROM php:8.1.28-cli-alpine
+FROM php:8.2.19-cli-alpine
 # FROM php:8.3.4-cli-alpine
 
 LABEL Maintainer="ShaoBo Wan (Tinywan) <756684177@qq.com>" \
@@ -26,8 +26,10 @@ RUN chmod +x install.sh \
 
 RUN php -m
 
-# Add Composer
-RUN curl -sS https://getcomposer.org/installer | php && mv composer.phar /usr/local/bin/composer
+# 安装 Composer
+RUN curl -o /usr/bin/composer https://mirrors.aliyun.com/composer/composer.phar   && chmod +x /usr/bin/composer
+ENV COMPOSER_HOME=/tmp/composer
+
 
 # Configure PHP
 COPY config/php.ini /usr/local/etc/php/conf.d/zzz_custom.ini

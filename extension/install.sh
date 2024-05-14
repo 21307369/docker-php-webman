@@ -43,16 +43,49 @@ isPhpVersionGreaterOrEqual() {
 # Param 1: Package name with version
 # Param 2: enable options
 #
+# installExtensionFromTgz() {
+#     tgzName=$1
+#     extensionName="${tgzName%%-*}"
+
+#     mkdir ${extensionName}
+#     tar -xf ${tgzName}.tgz -C ${extensionName} --strip-components=1
+#     (cd ${extensionName} && phpize && ./configure && make ${MC} && make install)
+
+#     docker-php-ext-enable ${extensionName} $2
+# }
+
 installExtensionFromTgz() {
     tgzName=$1
     extensionName="${tgzName%%-*}"
+    tgzFileName="${tgzName}.tgz"
+    downloadUrl="https://pecl.php.net/get/${tgzFileName}"
 
-    mkdir ${extensionName}
-    tar -xf ${tgzName}.tgz -C ${extensionName} --strip-components=1
-    (cd ${extensionName} && phpize && ./configure && make ${MC} && make install)
+    # 检查扩展的tgz包是否存在
+    if [ ! -f "$tgzFileName" ]; then
+        echo "Package $tgzFileName not found. Downloading from PECL..."
+        # 使用curl下载tgz包
+        if ! curl -o "$tgzFileName" "$downloadUrl"; then
+            echo "Failed to download $tgzFileName from PECL."
+            return 1
+        fi
+    fi
 
-    docker-php-ext-enable ${extensionName} $2
+    # 创建临时目录并解压
+    mkdir -p /tmp/${extensionName}
+    tar -xf ${tgzFileName} -C /tmp/${extensionName} --strip-components=1
+
+    # 进入解压后的目录并执行安装命令
+    (cd /tmp/${extensionName} && phpize && ./configure && make ${MC} && make install)
+
+    # 启用扩展
+    docker-php-ext-enable ${extensionName}
+
+    # 清理下载的tgz包和解压后的文件
+    rm -f ${tgzFileName}
+    rm -rf /tmp/${extensionName}
 }
+
+
 
 if [[ -z "${EXTENSIONS##*,pdo_mysql,*}" ]]; then
     echo "---------- Install pdo_mysql ----------"
@@ -457,7 +490,7 @@ if [[ -z "${EXTENSIONS##*,redis,*}" ]]; then
     echo "---------- Install redis ----------"
     isPhpVersionGreaterOrEqual 8 0
     if [[ "$?" = "1" ]]; then
-        installExtensionFromTgz redis-5.3.4
+        installExtensionFromTgz redis-6.0.2
     else
         printf "\n" | pecl install redis-4.3.0
         docker-php-ext-enable redis
@@ -495,17 +528,14 @@ fi
 
 if [[ -z "${EXTENSIONS##*,xdebug,*}" ]]; then
     echo "---------- Install xdebug ----------"
-    isPhpVersionGreaterOrEqual 7 0
+    isPhpVersionGreaterOrEqual 8 0
 
-    if [[ "$?" = "1" ]]; then
-        isPhpVersionGreaterOrEqual 7 4
-        if [[ "$?" = "1" ]]; then
-            installExtensionFromTgz xdebug-2.9.0
-        else
-            installExtensionFromTgz xdebug-2.5.5
-        fi
+    if [[ "$?" -eq 1 ]]; then
+        # 对于 PHP 8.0 及以上版本，安装 xdebug-3.3.2
+        installExtensionFromTgz "xdebug-3.3.2"
     else
-        installExtensionFromTgz xdebug-2.5.5
+        # 对于 PHP 8.0 以下版本，安装 xdebug-3.1.3
+        installExtensionFromTgz "xdebug-3.1.3"
     fi
 fi
 
@@ -520,7 +550,7 @@ if [[ -z "${EXTENSIONS##*,event,*}" ]]; then
     fi
 
     echo "---------- Install event again ----------"
-    installExtensionFromTgz event-3.0.5 "--ini-name event.ini"
+    installExtensionFromTgz event-3.1.3 "--ini-name event.ini"
 fi
 
 if [[ -z "${EXTENSIONS##*,mongodb,*}" ]]; then
@@ -647,7 +677,7 @@ if [[ -z "${EXTENSIONS##*,protobuf,*}" ]]; then
     isPhpVersionGreaterOrEqual 8 0
 
     if [[ "$?" = "1" ]]; then
-        installExtensionFromTgz protobuf-3.13.0.1
+        installExtensionFromTgz protobuf-4.26.1
     else
         echo "---------- PHP Version>= 7.2----------"
     fi
@@ -658,7 +688,7 @@ if [[ -z "${EXTENSIONS##*,grpc,*}" ]]; then
     isPhpVersionGreaterOrEqual 7 2
 
     if [[ "$?" = "1" ]]; then
-        installExtensionFromTgz grpc-1.33.1
+        installExtensionFromTgz grpc-1.63.0
     else
         echo "---------- PHP Version>= 7.2----------"
     fi
